@@ -124,18 +124,29 @@ func (v *CloudView) SetStatus(msg string, isErr bool) {
 	v.isError = isErr
 }
 
-func (v CloudView) Render(width int) string {
+func (v CloudView) Render(width, height int) string {
 	var s strings.Builder
 
-	s.WriteString(StyleHeader.Render("☁️  Cloud Integrations & API Keys (Disbox Account)") + "\n\n")
+	s.WriteString(StyleHeader.Render("☁️  Cloud Integrations & API Keys (Disbox Account)") + "\n")
 
 	labels := []string{
-		"PixelDrain API Key",
-		"GoFile API Token",
-		"1Fichier API Key",
-		"Google Drive Token",
+		"PixelDrain Key",
+		"GoFile Token",
+		"1Fichier Key",
+		"Google Drive",
 		"Dropbox Token",
 		"OneDrive Token",
+	}
+
+	inputWidth := width - 30
+	if inputWidth < 25 {
+		inputWidth = 25
+	}
+	if inputWidth > 45 {
+		inputWidth = 45
+	}
+	for i := range v.inputs {
+		v.inputs[i].Width = inputWidth
 	}
 
 	var formBuilder strings.Builder
@@ -144,30 +155,41 @@ func (v CloudView) Render(width int) string {
 		if i == v.focus {
 			marker = StyleKey.Render("▶ ")
 		}
-		field := fmt.Sprintf("%s%s:\n  %s\n", marker, StyleValue.Render(label), v.inputs[i].View())
-		formBuilder.WriteString(field + "\n")
+		if width >= 60 {
+			// Compact 1-line per field
+			field := fmt.Sprintf("%s%-16s %s\n", marker, StyleValue.Render(label+":"), v.inputs[i].View())
+			formBuilder.WriteString(field)
+		} else {
+			// 2-line per field on very narrow terminals
+			field := fmt.Sprintf("%s%s:\n  %s\n", marker, StyleValue.Render(label), v.inputs[i].View())
+			formBuilder.WriteString(field)
+		}
 	}
 
 	var helpLine string
 	if v.IsFocused() {
-		helpLine = StyleHelp.Render("Tab / ↑↓: Navigate Fields • ") +
-			StyleKey.Render("Enter / Ctrl+S") + StyleHelp.Render(": Save • ") +
-			StyleKey.Render("Esc") + StyleHelp.Render(": Unfocus & Switch Tabs")
+		helpLine = StyleHelp.Render("Tab/↑↓: Fields • ") +
+			StyleKey.Render("Enter/Ctrl+S") + StyleHelp.Render(": Save • ") +
+			StyleKey.Render("Esc") + StyleHelp.Render(": Unfocus")
 	} else {
-		helpLine = StyleHelp.Render("Click field or press ") +
-			StyleKey.Render("Tab / Enter") + StyleHelp.Render(" to edit • ") +
-			StyleKey.Render("← / →") + StyleHelp.Render(": Switch Tabs")
+		helpLine = StyleHelp.Render("Click / ") +
+			StyleKey.Render("Tab/Enter") + StyleHelp.Render(" to edit • ") +
+			StyleKey.Render("←/→") + StyleHelp.Render(": Tabs")
 	}
 
-	panelContent := formBuilder.String() + helpLine
+	panelContent := formBuilder.String() + "\n" + helpLine
 	if v.status != "" {
 		if v.isError {
-			panelContent += "\n\n" + StyleError.Render("❌ "+v.status)
+			panelContent += "\n" + StyleError.Render("❌ "+v.status)
 		} else {
-			panelContent += "\n\n" + StyleSuccess.Render("✓ "+v.status)
+			panelContent += "\n" + StyleSuccess.Render("✓ "+v.status)
 		}
 	}
 
-	s.WriteString(StylePanel.Width(width - 8).Render(panelContent))
+	panelWidth := width - 6
+	if panelWidth < 30 {
+		panelWidth = 30
+	}
+	s.WriteString(StylePanel.Width(panelWidth).Render(panelContent))
 	return s.String()
 }

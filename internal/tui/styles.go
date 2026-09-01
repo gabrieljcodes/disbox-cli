@@ -21,14 +21,13 @@ var (
 
 	// Typography & Containers
 	StyleApp = lipgloss.NewStyle().
-			Padding(1, 2).
+			Padding(0, 1).
 			Background(ColorBgDark).
 			Foreground(ColorText)
 
 	StyleHeader = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorPrimary).
-			MarginBottom(1)
+			Foreground(ColorPrimary)
 
 	StyleLogo = lipgloss.NewStyle().
 			Bold(true).
@@ -43,21 +42,20 @@ var (
 			Background(ColorPanel).
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(ColorPrimary).
-			Padding(0, 2)
+			Padding(0, 1)
 
 	StyleTabInactive = lipgloss.NewStyle().
 				Foreground(ColorMuted).
 				Background(ColorBgDark).
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(ColorBorder).
-				Padding(0, 2)
+				Padding(0, 1)
 
 	StylePanel = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(ColorBorder).
 			Background(ColorPanel).
-			Padding(1, 2).
-			MarginTop(1)
+			Padding(0, 1)
 
 	StyleBadgeGreen = lipgloss.NewStyle().
 			Bold(true).

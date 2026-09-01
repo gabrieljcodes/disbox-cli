@@ -45,7 +45,7 @@ disbox-cli
 
 #### Add Tab (`F2`)
 - `Click Box` / `Enter`: Focus textarea to type/paste links
-- `Ctrl+S` / `Alt+Enter` / `Ctrl+D`: Submit all links
+- `Ctrl+S` / `Ctrl+D`: Submit all links
 - `Ctrl+T`: Toggle auto local download
 - `Ctrl+G`: Toggle auto cloud dispatch
 - `p`: Cycle auto-cloud destination provider

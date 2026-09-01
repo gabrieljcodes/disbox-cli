@@ -224,15 +224,15 @@ func (v *HistoryView) SelectedCloudProvider() (string, bool) {
 	return CloudProviders[v.cloudCursor].ID, v.sendZip
 }
 
-func (v HistoryView) Render(width int) string {
+func (v HistoryView) Render(width, height int) string {
 	var s strings.Builder
 
-	panelWidth := width - 8
-	if panelWidth < 40 {
-		panelWidth = 40
+	panelWidth := width - 6
+	if panelWidth < 30 {
+		panelWidth = 30
 	}
 
-	s.WriteString(StyleHeader.Render("📜 Disbox Download History & Cloud Export") + "\n\n")
+	s.WriteString(StyleHeader.Render("📜 Disbox Download History & Cloud Export") + "\n")
 
 	// ── Cloud Export Modal ──
 	if v.showCloudModal {
@@ -246,8 +246,8 @@ func (v HistoryView) Render(width int) string {
 		}
 
 		var modalContent strings.Builder
-		modalContent.WriteString(StyleHeader.Render(fmt.Sprintf("☁️  Dispatch '%s' to Cloud", itemName)) + "\n\n")
-		modalContent.WriteString(StyleValue.Render("Select destination cloud provider:") + "\n\n")
+		modalContent.WriteString(StyleHeader.Render(fmt.Sprintf("☁️  Dispatch '%s' to Cloud", itemName)) + "\n")
+		modalContent.WriteString(StyleValue.Render("Select destination cloud provider:\n"))
 
 		for i, p := range CloudProviders {
 			marker := "  "
@@ -264,10 +264,10 @@ func (v HistoryView) Render(width int) string {
 		if v.sendZip {
 			zipBox = "[x] Send as .ZIP archive"
 		}
-		modalContent.WriteString("\n" + StyleValue.Render(zipBox) + "  " + StyleHelp.Render("(Press 'z' to toggle)") + "\n\n")
+		modalContent.WriteString(StyleValue.Render(zipBox) + "  " + StyleHelp.Render("(Press 'z' to toggle)\n\n"))
 
 		modalContent.WriteString(
-			StyleHelp.Render("Press ") + StyleKey.Render("1-6") + StyleHelp.Render(" or ") + StyleKey.Render("Enter") + StyleHelp.Render(" to Dispatch • ") +
+			StyleHelp.Render("Press ") + StyleKey.Render("1-6") + StyleHelp.Render(" / ") + StyleKey.Render("Enter") + StyleHelp.Render(" to Dispatch • ") +
 				StyleKey.Render("Esc") + StyleHelp.Render(" to Cancel"),
 		)
 
@@ -276,6 +276,15 @@ func (v HistoryView) Render(width int) string {
 	}
 
 	// ── Normal History View ──
+	// Calculate dynamic page size based on available window height
+	calcPageSize := height - 14
+	if calcPageSize < 4 {
+		calcPageSize = 4
+	} else if calcPageSize > 12 {
+		calcPageSize = 12
+	}
+	v.pageSize = calcPageSize
+
 	vis := v.getVisibleItems()
 
 	// Search bar row
@@ -294,9 +303,9 @@ func (v HistoryView) Render(width int) string {
 
 	searchHint := StyleHelp.Render("Press '/' to search")
 	if v.searchInput.Focused() {
-		searchHint = StyleHelp.Render("Type query • Press Enter / Esc when done")
+		searchHint = StyleHelp.Render("Type query • Enter/Esc when done")
 	} else if v.searchInput.Value() != "" {
-		searchHint = StyleHelp.Render(fmt.Sprintf("%d matched • Press '/' to edit • Ctrl+U to clear", len(vis)))
+		searchHint = StyleHelp.Render(fmt.Sprintf("%d matched • '/' edit • Ctrl+U clear", len(vis)))
 	}
 
 	searchRow := lipgloss.JoinHorizontal(lipgloss.Center, searchBoxStyle.Render(v.searchInput.View()), "  ", searchHint)
@@ -304,9 +313,9 @@ func (v HistoryView) Render(width int) string {
 	if len(vis) == 0 {
 		var emptyMsg string
 		if v.searchInput.Value() != "" {
-			emptyMsg = fmt.Sprintf("No history matches for query '%s'.\n\nPress '/' to change search, or Ctrl+U to clear filter.", v.searchInput.Value())
+			emptyMsg = fmt.Sprintf("No history matches for '%s'.\nPress '/' to edit search, or Ctrl+U to clear.", v.searchInput.Value())
 		} else {
-			emptyMsg = "No history items found.\n\nPress " + StyleKey.Render("r") + " to refresh from server."
+			emptyMsg = "No history items found.\nPress " + StyleKey.Render("r") + " to refresh from server."
 		}
 
 		panelContent := searchRow + "\n\n" + emptyMsg
@@ -327,7 +336,7 @@ func (v HistoryView) Render(width int) string {
 	}
 
 	var listBuilder strings.Builder
-	listBuilder.WriteString(searchRow + "\n\n")
+	listBuilder.WriteString(searchRow + "\n")
 
 	for i := start; i < end; i++ {
 		item := vis[i]
@@ -362,20 +371,20 @@ func (v HistoryView) Render(width int) string {
 	nextBtn := StyleBadgeBlue.Render(" Next (PgDn) ▶ ")
 	pageInfo := StyleValue.Render(fmt.Sprintf("Page %d of %d (%d items)", currentPage, totalPages, len(vis)))
 
-	paginationBar := fmt.Sprintf("\n%s  %s  %s\n", prevBtn, pageInfo, nextBtn)
+	paginationBar := fmt.Sprintf("%s  %s  %s\n", prevBtn, pageInfo, nextBtn)
 
-	helpLine := StyleHelp.Render("↑↓/jk: Select • ") +
+	helpLine := StyleHelp.Render("↑↓: Select • ") +
 		StyleKey.Render("d/Enter") + StyleHelp.Render(": Download • ") +
-		StyleKey.Render("c/p") + StyleHelp.Render(": Send to Cloud • ") +
+		StyleKey.Render("c/p") + StyleHelp.Render(": Cloud • ") +
 		StyleKey.Render("/") + StyleHelp.Render(": Search • ") +
 		StyleKey.Render("←/→") + StyleHelp.Render(": Tabs")
 
-	panelContent := listBuilder.String() + paginationBar + "\n" + helpLine
+	panelContent := listBuilder.String() + "\n" + paginationBar + helpLine
 	if v.status != "" {
 		if v.isError {
-			panelContent += "\n\n" + StyleError.Render("❌ "+v.status)
+			panelContent += "\n" + StyleError.Render("❌ "+v.status)
 		} else {
-			panelContent += "\n\n" + StyleSuccess.Render("✓ "+v.status)
+			panelContent += "\n" + StyleSuccess.Render("✓ "+v.status)
 		}
 	}
 

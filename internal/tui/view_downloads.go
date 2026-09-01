@@ -22,18 +22,18 @@ func NewDownloadsView() DownloadsView {
 	return DownloadsView{prog: p}
 }
 
-func (v DownloadsView) Render(tasks []downloader.DownloadTask, width int) string {
+func (v DownloadsView) Render(tasks []downloader.DownloadTask, width, height int) string {
 	var s strings.Builder
 
-	s.WriteString(StyleHeader.Render("📥 Local Download Queue & Debrid Status") + "\n\n")
+	s.WriteString(StyleHeader.Render("📥 Local Download Queue & Debrid Status") + "\n")
 
 	if v.flash != "" {
-		s.WriteString(StyleSuccess.Render("✓ "+v.flash) + "\n\n")
+		s.WriteString(StyleSuccess.Render("✓ "+v.flash) + "\n")
 	}
 
-	panelWidth := width - 8
-	if panelWidth < 40 {
-		panelWidth = 40
+	panelWidth := width - 6
+	if panelWidth < 30 {
+		panelWidth = 30
 	}
 
 	if len(tasks) == 0 {
@@ -60,7 +60,7 @@ func (v DownloadsView) Render(tasks []downloader.DownloadTask, width int) string
 	}
 
 	summary := fmt.Sprintf(
-		"%s %d active   %s %d completed   %s %d failed   │   Press %s to clear finished",
+		"%s %d active  %s %d done  %s %d failed  │  Press %s to clear",
 		StyleBadgeBlue.Render("⬤"), active,
 		StyleBadgeGreen.Render("⬤"), completed,
 		StyleBadgeRed.Render("⬤"), failed,
@@ -68,11 +68,23 @@ func (v DownloadsView) Render(tasks []downloader.DownloadTask, width int) string
 	)
 
 	var listBuilder strings.Builder
-	listBuilder.WriteString(summary + "\n\n")
+	listBuilder.WriteString(summary + "\n")
 
-	divider := StyleHelp.Render(strings.Repeat("─", panelWidth-6))
+	divider := StyleHelp.Render(strings.Repeat("─", panelWidth-4))
 
-	for i, task := range tasks {
+	// Calculate how many tasks fit comfortably
+	maxTasks := (height - 12) / 3
+	if maxTasks < 2 {
+		maxTasks = 2
+	}
+	displayTasks := tasks
+	hiddenCount := 0
+	if len(tasks) > maxTasks {
+		displayTasks = tasks[:maxTasks]
+		hiddenCount = len(tasks) - maxTasks
+	}
+
+	for i, task := range displayTasks {
 		statusBadge := ""
 		switch task.Status {
 		case downloader.StatusDownloading:
@@ -114,7 +126,7 @@ func (v DownloadsView) Render(tasks []downloader.DownloadTask, width int) string
 
 		// Line 1: [1] STATUS Name (Size)
 		line1 := fmt.Sprintf(
-			"[%d] %s %s  %s",
+			"[%d] %s %s %s",
 			i+1,
 			statusBadge,
 			StyleHeader.Render(name),
@@ -147,7 +159,7 @@ func (v DownloadsView) Render(tasks []downloader.DownloadTask, width int) string
 		// Line 3: Destination & Cloud status
 		destLine := fmt.Sprintf("    📁 %s", StyleHelp.Render(task.DestDir))
 		if task.CloudStatus != "" {
-			destLine += fmt.Sprintf("  •  %s", StyleBadgeYellow.Render(" "+task.CloudStatus+" "))
+			destLine += fmt.Sprintf(" • %s", StyleBadgeYellow.Render(" "+task.CloudStatus+" "))
 		}
 
 		listBuilder.WriteString(line1 + "\n" + line2 + "\n" + destLine + "\n")
@@ -159,9 +171,13 @@ func (v DownloadsView) Render(tasks []downloader.DownloadTask, width int) string
 		}
 
 		// Add separator between tasks
-		if i < len(tasks)-1 {
+		if i < len(displayTasks)-1 {
 			listBuilder.WriteString(divider + "\n")
 		}
+	}
+
+	if hiddenCount > 0 {
+		listBuilder.WriteString("\n" + StyleHelp.Render(fmt.Sprintf("... and %d more task(s) in queue", hiddenCount)))
 	}
 
 	s.WriteString(StylePanel.Width(panelWidth).Render(listBuilder.String()))

@@ -114,16 +114,25 @@ func (v *AddView) GetCloudProvider() string {
 	return CloudProviders[v.cloudProviderIdx].ID
 }
 
-func (v AddView) Render(width int) string {
+func (v AddView) Render(width, height int) string {
 	var s strings.Builder
 
-	s.WriteString(StyleHeader.Render("➕ Add Downloads (Single or Multiple Links / Magnets)") + "\n\n")
+	s.WriteString(StyleHeader.Render("➕ Add Downloads (Single or Multiple Links / Magnets)") + "\n")
 
-	boxWidth := width - 14
+	boxWidth := width - 12
 	if boxWidth < 30 {
 		boxWidth = 30
 	}
 	v.textarea.SetWidth(boxWidth - 4)
+
+	// Dynamically adjust textarea height based on terminal height
+	taHeight := 3
+	if height >= 30 {
+		taHeight = 5
+	} else if height >= 26 {
+		taHeight = 4
+	}
+	v.textarea.SetHeight(taHeight)
 
 	var boxStyle lipgloss.Style
 	var boxHint string
@@ -133,8 +142,8 @@ func (v AddView) Render(width int) string {
 			BorderForeground(ColorPrimary).
 			Padding(0, 1).
 			Width(boxWidth)
-		boxHint = StyleHelp.Render("⌨️  Editing Mode: ") +
-			StyleKey.Render("Ctrl+S") + StyleHelp.Render(" / ") + StyleKey.Render("Alt+Enter") + StyleHelp.Render(" / ") + StyleKey.Render("Ctrl+D") + StyleHelp.Render(": Submit • ") +
+		boxHint = StyleHelp.Render("⌨️  ") +
+			StyleKey.Render("Ctrl+S") + StyleHelp.Render(" / ") + StyleKey.Render("Ctrl+D") + StyleHelp.Render(": Submit • ") +
 			StyleKey.Render("Enter") + StyleHelp.Render(": New line • ") +
 			StyleKey.Render("Esc") + StyleHelp.Render(": Unfocus")
 	} else {
@@ -143,8 +152,8 @@ func (v AddView) Render(width int) string {
 			BorderForeground(ColorBorder).
 			Padding(0, 1).
 			Width(boxWidth)
-		boxHint = StyleHelp.Render("💡 Click box or press ") +
-			StyleKey.Render("Enter") + StyleHelp.Render(" to paste/type • Use ") +
+		boxHint = StyleHelp.Render("💡 ") +
+			StyleKey.Render("Enter") + StyleHelp.Render(" / Click to type • ") +
 			StyleKey.Render("← / →") + StyleHelp.Render(" to switch tabs")
 	}
 
@@ -153,60 +162,64 @@ func (v AddView) Render(width int) string {
 	linkCount := len(v.GetLinks())
 	var countInfo string
 	if linkCount > 0 {
-		countInfo = fmt.Sprintf(" (%d links detected)", linkCount)
+		countInfo = fmt.Sprintf(" (%d link(s))", linkCount)
 	}
 
 	// ── Options Row ──
-	toggleDownStr := "[x] Automatically download to local folder when ready"
+	toggleDownStr := "[x] Auto download to local folder"
 	if !v.autoDownload {
-		toggleDownStr = "[ ] Automatically download to local folder when ready"
+		toggleDownStr = "[ ] Auto download to local folder"
 	}
 
-	toggleCloudStr := "[x] Automatically send to Cloud when ready on Debrid"
+	toggleCloudStr := "[x] Auto send to Cloud on Debrid"
 	if !v.autoCloud {
-		toggleCloudStr = "[ ] Automatically send to Cloud when ready on Debrid"
+		toggleCloudStr = "[ ] Auto send to Cloud on Debrid"
 	}
 
 	currProv := CloudProviders[v.cloudProviderIdx]
 	cloudDetails := ""
 	if v.autoCloud {
-		zipStr := "[ ] Send as .ZIP"
+		zipStr := "[ ] .ZIP"
 		if v.cloudZip {
-			zipStr = "[x] Send as .ZIP"
+			zipStr = "[x] .ZIP"
 		}
 		cloudDetails = fmt.Sprintf(
-			"    Destination: %s  %s  │  %s  %s\n",
-			StyleBadgeBlue.Render(fmt.Sprintf(" %s %s (%s) ", currProv.Icon, currProv.Name, currProv.ID)),
-			StyleHelp.Render("(Click / 'p' to change)"),
+			"    → %s %s │ %s %s\n",
+			StyleBadgeBlue.Render(fmt.Sprintf(" %s %s ", currProv.Icon, currProv.Name)),
+			StyleHelp.Render("(Click/'p')"),
 			StyleValue.Render(zipStr),
-			StyleHelp.Render("(Click / 'z' to toggle)"),
+			StyleHelp.Render("(Click/'z')"),
 		)
 	}
 
-	submitBtn := StyleBadgeGreen.Render(fmt.Sprintf(" 🚀 [ Submit All %d Link(s) (Ctrl+S / Alt+Enter) ] ", linkCount))
+	submitBtn := StyleBadgeGreen.Render(fmt.Sprintf(" 🚀 [ Submit %d Link(s) (Ctrl+S / Click) ] ", linkCount))
 	if linkCount == 0 {
-		submitBtn = StyleTabInactive.Render(" 🚀 [ Submit All Links (Ctrl+S / Alt+Enter) ] ")
+		submitBtn = StyleTabInactive.Render(" 🚀 [ Submit Links (Ctrl+S / Click) ] ")
 	}
 
-	content := fmt.Sprintf("Paste one or multiple Torrent Magnet links or WebDL URLs%s:\n\n", StyleValue.Render(countInfo)) +
+	content := fmt.Sprintf("Paste Torrent Magnets or WebDL URLs%s:\n", StyleValue.Render(countInfo)) +
 		inputDisplay + "\n" +
-		boxHint + "\n\n" +
+		boxHint + "\n" +
 		StyleValue.Render(toggleDownStr) + "  " + StyleHelp.Render("('Ctrl+T' / Click)") + "\n" +
 		StyleValue.Render(toggleCloudStr) + "  " + StyleHelp.Render("('Ctrl+G' / Click)") + "\n" +
-		cloudDetails + "\n" +
+		cloudDetails +
 		submitBtn
 
 	if v.message != "" {
-		content += "\n\n"
+		content += "\n"
 		if v.isError {
 			content += StyleError.Render("❌ " + v.message)
 		} else {
 			content += StyleSuccess.Render("✓ " + v.message)
 		}
 	} else if v.submitting {
-		content += "\n\n" + StyleBadgeBlue.Render(" Submitting to Disbox... ")
+		content += "\n" + StyleBadgeBlue.Render(" Submitting to Disbox... ")
 	}
 
-	s.WriteString(StylePanel.Width(width - 8).Render(content))
+	panelWidth := width - 6
+	if panelWidth < 30 {
+		panelWidth = 30
+	}
+	s.WriteString(StylePanel.Width(panelWidth).Render(content))
 	return s.String()
 }

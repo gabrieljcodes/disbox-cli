@@ -464,7 +464,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.addView.Focus()
 					return m, nil
-				case "s", "ctrl+s", "alt+enter", "ctrl+d":
+				case "s", "ctrl+s", "ctrl+d":
 					if submitCmd := m.submitLinksCmd(); submitCmd != nil {
 						return m, submitCmd
 					}
@@ -498,7 +498,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+g":
 				m.addView.ToggleAutoCloud()
 				return m, nil
-			case "ctrl+s", "ctrl+d", "alt+enter", "ctrl+j":
+			case "ctrl+s", "ctrl+d", "ctrl+j":
 				if submitCmd := m.submitLinksCmd(); submitCmd != nil {
 					return m, submitCmd
 				}
@@ -712,6 +712,38 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m AppModel) tabTitles() []string {
+	titles := []string{
+		"◀ [F1] 📥 Queue",
+		"[F2] ➕ Add",
+		"[F3] 📜 History",
+		"[F4] ☁️  Cloud Keys",
+		"[F5] ⚙️  Settings ▶",
+	}
+	if m.activeTab == 0 {
+		titles[0] = "  [F1] 📥 Queue"
+	}
+	if m.activeTab == 4 {
+		titles[4] = "[F5] ⚙️  Settings  "
+	}
+	return titles
+}
+
+func (m AppModel) getTabWidths() []int {
+	titles := m.tabTitles()
+	widths := make([]int, len(titles))
+	for i, title := range titles {
+		var rendered string
+		if i == m.activeTab {
+			rendered = StyleTabActive.Render(title)
+		} else {
+			rendered = StyleTabInactive.Render(title)
+		}
+		widths[i] = lipgloss.Width(rendered)
+	}
+	return widths
+}
+
 func (m AppModel) View() string {
 	var s strings.Builder
 
@@ -726,25 +758,11 @@ func (m AppModel) View() string {
 	}
 
 	headerRow := lipgloss.JoinHorizontal(lipgloss.Center, logo, " ", serverBadge, queueInfo)
-	s.WriteString(headerRow + "\n\n")
+	s.WriteString(headerRow + "\n")
 
-	// ── Tabs (track widths for mouse hit detection) ──
-	tabTitles := []string{
-		"◀ [F1] 📥 Queue",
-		"[F2] ➕ Add",
-		"[F3] 📜 History",
-		"[F4] ☁️  Cloud Keys",
-		"[F5] ⚙️  Settings ▶",
-	}
-	if m.activeTab == 0 {
-		tabTitles[0] = "  [F1] 📥 Queue"
-	}
-	if m.activeTab == 4 {
-		tabTitles[4] = "[F5] ⚙️  Settings  "
-	}
-
+	// ── Tabs (rendered horizontally) ──
+	tabTitles := m.tabTitles()
 	var renderedTabs []string
-	widths := make([]int, len(tabTitles))
 	for i, title := range tabTitles {
 		var rendered string
 		if i == m.activeTab {
@@ -753,23 +771,26 @@ func (m AppModel) View() string {
 			rendered = StyleTabInactive.Render(title)
 		}
 		renderedTabs = append(renderedTabs, rendered)
-		widths[i] = lipgloss.Width(rendered)
 	}
-	m.tabWidths = widths
 	s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...) + "\n")
 
 	// ── Content ──
+	contentHeight := m.height - 6
+	if contentHeight < 15 {
+		contentHeight = 15
+	}
+
 	switch m.activeTab {
 	case 0:
-		s.WriteString(m.downloadsView.Render(m.queueMgr.GetTasks(), m.width))
+		s.WriteString(m.downloadsView.Render(m.queueMgr.GetTasks(), m.width, contentHeight))
 	case 1:
-		s.WriteString(m.addView.Render(m.width))
+		s.WriteString(m.addView.Render(m.width, contentHeight))
 	case 2:
-		s.WriteString(m.historyView.Render(m.width))
+		s.WriteString(m.historyView.Render(m.width, contentHeight))
 	case 3:
-		s.WriteString(m.cloudView.Render(m.width))
+		s.WriteString(m.cloudView.Render(m.width, contentHeight))
 	case 4:
-		s.WriteString(m.settingsView.Render(m.width))
+		s.WriteString(m.settingsView.Render(m.width, contentHeight))
 	}
 
 	// ── Footer (context-aware) ──
@@ -787,17 +808,17 @@ func (m AppModel) View() string {
 		if m.addView.IsFocused() {
 			footer = fmt.Sprintf(
 				"%s %s • %s %s • %s %s • %s",
-				StyleKey.Render("Ctrl+S / Alt+Enter / Ctrl+D:"), StyleValue.Render("Submit All"),
+				StyleKey.Render("Ctrl+S / Ctrl+D:"), StyleValue.Render("Submit"),
 				StyleKey.Render("Enter:"), StyleValue.Render("New line"),
-				StyleKey.Render("Esc:"), StyleValue.Render("Unfocus / Navigate"),
+				StyleKey.Render("Esc:"), StyleValue.Render("Unfocus"),
 				StyleKey.Render("Click / F1-F5: Tabs"),
 			)
 		} else {
 			footer = fmt.Sprintf(
 				"%s %s • %s %s • %s %s • %s",
-				StyleKey.Render("Click box / Enter:"), StyleValue.Render("Edit Links"),
-				StyleKey.Render("←/→:"), StyleValue.Render("Switch Tab"),
-				StyleKey.Render("Ctrl+T / Ctrl+G:"), StyleValue.Render("Toggle Auto-Down/Cloud"),
+				StyleKey.Render("Click / Enter:"), StyleValue.Render("Edit Links"),
+				StyleKey.Render("←/→:"), StyleValue.Render("Tabs"),
+				StyleKey.Render("Ctrl+T / Ctrl+G:"), StyleValue.Render("Toggle Down/Cloud"),
 				StyleKey.Render("Click / F1-F5: Tabs"),
 			)
 		}
@@ -805,7 +826,7 @@ func (m AppModel) View() string {
 		if m.historyView.IsModalOpen() {
 			footer = fmt.Sprintf(
 				"%s %s • %s %s • %s %s • %s",
-				StyleKey.Render("1-6 / Enter:"), StyleValue.Render("Dispatch to Cloud"),
+				StyleKey.Render("1-6 / Enter:"), StyleValue.Render("Dispatch"),
 				StyleKey.Render("z:"), StyleValue.Render("Toggle ZIP"),
 				StyleKey.Render("Esc:"), StyleValue.Render("Cancel"),
 				StyleKey.Render("F1-F5: Tabs"),
@@ -813,8 +834,8 @@ func (m AppModel) View() string {
 		} else if m.historyView.IsSearchFocused() {
 			footer = fmt.Sprintf(
 				"%s %s • %s %s • %s",
-				StyleKey.Render("Type Query:"), StyleValue.Render("Filter History"),
-				StyleKey.Render("Enter / Esc:"), StyleValue.Render("Finish Search"),
+				StyleKey.Render("Query:"), StyleValue.Render("Filter History"),
+				StyleKey.Render("Enter / Esc:"), StyleValue.Render("Done"),
 				StyleKey.Render("Ctrl+U: Clear"),
 			)
 		} else {
@@ -822,7 +843,7 @@ func (m AppModel) View() string {
 				"%s %s • %s %s • %s %s • %s %s • %s",
 				StyleKey.Render("↑↓:"), StyleValue.Render("Select"),
 				StyleKey.Render("d/Enter:"), StyleValue.Render("Download"),
-				StyleKey.Render("c:"), StyleValue.Render("Send to Cloud"),
+				StyleKey.Render("c:"), StyleValue.Render("Cloud"),
 				StyleKey.Render("/:"), StyleValue.Render("Search"),
 				StyleKey.Render("←/→: Tabs"),
 			)
@@ -833,14 +854,14 @@ func (m AppModel) View() string {
 				"%s %s • %s %s • %s %s • %s",
 				StyleKey.Render("Tab / ↑↓:"), StyleValue.Render("Fields"),
 				StyleKey.Render("Enter / Ctrl+S:"), StyleValue.Render("Save"),
-				StyleKey.Render("Esc:"), StyleValue.Render("Unfocus / Navigate"),
+				StyleKey.Render("Esc:"), StyleValue.Render("Unfocus"),
 				StyleKey.Render("Click / F1-F5: Tabs"),
 			)
 		} else {
 			footer = fmt.Sprintf(
 				"%s %s • %s %s • %s %s • %s",
-				StyleKey.Render("Click / Tab / Enter:"), StyleValue.Render("Edit Fields"),
-				StyleKey.Render("←/→:"), StyleValue.Render("Switch Tab"),
+				StyleKey.Render("Click / Tab / Enter:"), StyleValue.Render("Edit"),
+				StyleKey.Render("←/→:"), StyleValue.Render("Tabs"),
 				StyleKey.Render("Enter / Ctrl+S:"), StyleValue.Render("Save"),
 				StyleKey.Render("Click / F1-F5: Tabs"),
 			)
@@ -851,37 +872,48 @@ func (m AppModel) View() string {
 				"%s %s • %s %s • %s %s • %s",
 				StyleKey.Render("Tab / ↑↓:"), StyleValue.Render("Fields"),
 				StyleKey.Render("Enter / Ctrl+S:"), StyleValue.Render("Save"),
-				StyleKey.Render("Esc:"), StyleValue.Render("Unfocus / Navigate"),
+				StyleKey.Render("Esc:"), StyleValue.Render("Unfocus"),
 				StyleKey.Render("Click / F1-F5: Tabs"),
 			)
 		} else {
 			footer = fmt.Sprintf(
 				"%s %s • %s %s • %s %s • %s",
-				StyleKey.Render("Click / Tab / Enter:"), StyleValue.Render("Edit Fields"),
-				StyleKey.Render("←/→:"), StyleValue.Render("Switch Tab"),
+				StyleKey.Render("Click / Tab / Enter:"), StyleValue.Render("Edit"),
+				StyleKey.Render("←/→:"), StyleValue.Render("Tabs"),
 				StyleKey.Render("Enter / Ctrl+S:"), StyleValue.Render("Save"),
 				StyleKey.Render("Click / F1-F5: Tabs"),
 			)
 		}
 	}
-	s.WriteString("\n\n" + StyleHelp.Render(footer))
+	s.WriteString("\n" + StyleHelp.Render(footer))
 
-	return StyleApp.Render(s.String())
+	rendered := StyleApp.Render(s.String())
+
+	// Clamp output to window height to prevent terminal scrolling
+	if m.height > 0 {
+		lines := strings.Split(rendered, "\n")
+		if len(lines) > m.height {
+			rendered = strings.Join(lines[:m.height], "\n")
+		}
+	}
+
+	return rendered
 }
 
 // handleTabClick detects which tab was clicked based on mouse X and Y coordinates.
 func (m *AppModel) handleTabClick(x, y int) []tea.Cmd {
-	if y < 2 || y > 5 || len(m.tabWidths) == 0 {
+	if y < 1 || y > 3 {
 		return nil
 	}
 
-	adjX := x - 2
+	tabWidths := m.getTabWidths()
+	adjX := x - 1
 	if adjX < 0 {
 		return nil
 	}
 
 	cumulative := 0
-	for i, w := range m.tabWidths {
+	for i, w := range tabWidths {
 		if adjX >= cumulative && adjX < cumulative+w {
 			return m.switchTab(i)
 		}
@@ -895,8 +927,8 @@ func (m *AppModel) handleContentClick(x, y int) []tea.Cmd {
 	// History tab clicks
 	if m.activeTab == 2 {
 		if m.historyView.IsModalOpen() {
-			if y >= 11 && y <= 16 {
-				idx := y - 11
+			if y >= 8 && y <= 13 {
+				idx := y - 8
 				m.historyView.SelectCloudProvider(idx)
 				provider, zip := m.historyView.SelectedCloudProvider()
 				if cmd := m.dispatchSelectedToCloudCmd(provider, zip); cmd != nil {
@@ -904,27 +936,27 @@ func (m *AppModel) handleContentClick(x, y int) []tea.Cmd {
 				}
 				return nil
 			}
-			if y >= 17 && y <= 19 {
+			if y >= 14 && y <= 16 {
 				m.historyView.ToggleZip()
 				return nil
 			}
 			return nil
 		}
 
-		// Search bar click around Y=8..10
-		if y >= 8 && y <= 10 && x < 55 {
+		// Search bar click around Y=5..7
+		if y >= 5 && y <= 7 && x < 55 {
 			m.historyView.FocusSearch()
 			return nil
 		}
 
-		// History items start around Y=11
-		if y >= 11 && y < 21 {
-			row := y - 11
+		// History items start around Y=8
+		if y >= 8 && y < 8+m.historyView.pageSize {
+			row := y - 8
 			m.historyView.SelectRow(row)
 			return nil
 		}
-		// Pagination line around Y=21..24
-		if y >= 21 && y <= 24 {
+		// Pagination line
+		if y >= 8+m.historyView.pageSize && y <= 8+m.historyView.pageSize+2 {
 			if x < m.width/2 {
 				m.historyView.PrevPage()
 			} else {
@@ -936,19 +968,19 @@ func (m *AppModel) handleContentClick(x, y int) []tea.Cmd {
 
 	// Add tab clicks (box focus, toggle download, toggle cloud, change cloud provider, submit button)
 	if m.activeTab == 1 {
-		if y >= 10 && y <= 18 {
+		if y >= 6 && y <= 11 {
 			m.addView.Focus()
 			return nil
 		}
-		if y >= 19 && y <= 20 {
+		if y >= 12 && y <= 13 {
 			m.addView.ToggleAutoDownload()
 			return nil
 		}
-		if y >= 21 && y <= 22 {
+		if y >= 14 && y <= 15 {
 			m.addView.ToggleAutoCloud()
 			return nil
 		}
-		if y >= 23 && y <= 24 && m.addView.autoCloud {
+		if y >= 16 && y <= 17 && m.addView.autoCloud {
 			if x < 40 {
 				m.addView.CycleCloudProvider()
 			} else {
@@ -956,7 +988,7 @@ func (m *AppModel) handleContentClick(x, y int) []tea.Cmd {
 			}
 			return nil
 		}
-		if y >= 25 {
+		if y >= 18 {
 			if submitCmd := m.submitLinksCmd(); submitCmd != nil {
 				return []tea.Cmd{submitCmd}
 			}
@@ -966,8 +998,8 @@ func (m *AppModel) handleContentClick(x, y int) []tea.Cmd {
 
 	// Cloud tab input focus
 	if m.activeTab == 3 {
-		if y >= 8 {
-			idx := (y - 8) / 3
+		if y >= 6 {
+			idx := y - 6
 			if idx >= 0 && idx < 6 {
 				m.cloudView.SetFocus(idx)
 			}
@@ -977,8 +1009,8 @@ func (m *AppModel) handleContentClick(x, y int) []tea.Cmd {
 
 	// Settings tab input focus
 	if m.activeTab == 4 {
-		if y >= 8 {
-			idx := (y - 8) / 3
+		if y >= 6 {
+			idx := y - 6
 			if idx >= 0 && idx < 4 {
 				m.settingsView.SetFocus(idx)
 			}
