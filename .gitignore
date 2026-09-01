@@ -1,0 +1,21 @@
+# Binaries
+bin/
+disbox-cli
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.txt
+
+# Local configurations & Environment
+.env
+.env.*
+*.local
+
+# System files
+.DS_Store
+Thumbs.db
